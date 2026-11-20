@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "",
+  "installCommand": "",
+  "outputDirectory": "web",
+  "cleanUrls": false,
+  "headers": [
+    { "source": "/(.*)\\.wasm", "headers": [ { "key": "Content-Type", "value": "application/wasm" }, { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" } ] },
+    { "source": "/manifest.webmanifest", "headers": [ { "key": "Content-Type", "value": "application/manifest+json" } ] },
+    { "source": "/(index.html|bookroom.js|sw.js|config.js|bridge.js|instalar.js)", "headers": [ { "key": "Cache-Control", "value": "no-cache" } ] }
+  ]
+}

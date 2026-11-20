@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono de "nota" sencillo y monocromo para los botones de lectura (RSVP y modo normal):
+     una hoja con la esquina doblada y dos líneas de texto, en el mismo lenguaje geométrico
+     plano que el resto de iconos de esta pantalla (ic_zoom, ic_index...), sustituyendo al
+     icono ilustrado a color que ahí quedaba feo a tamaño pequeño; ese icono a color se
+     conserva tal cual para el dock y la pantalla de Notas (ver ic_note.png), donde sí
+     funciona bien. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.7"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M5,4 L14,4 L19,9 L19,20 L5,20 Z M14,4 L14,9 L19,9" />
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M8,12.5 L15.5,12.5 M8,16 L13,16" />
+</vector>

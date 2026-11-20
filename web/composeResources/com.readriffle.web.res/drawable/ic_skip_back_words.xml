@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Doble flecha hacia la izquierda ("rebobinar"), para el botón de retroceder N palabras en
+     RSVP: ya no es un número ("−5") sino un símbolo, pedido explícito del usuario. Mismo estilo
+     de trazo que ic_chevron_down, en vez de triángulos rellenos, para que combine con el resto
+     de iconos monocromos y finos de la app. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.8"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M12,6 L6,12 L12,18" />
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.8"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M19,6 L13,12 L19,18" />
+</vector>

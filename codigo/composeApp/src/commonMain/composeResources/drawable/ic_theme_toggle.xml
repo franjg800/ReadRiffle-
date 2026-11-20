@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono de luna en creciente (alternar tema claro/oscuro): un círculo con otro círculo
+     desplazado restado por dirección de trazado opuesta, la construcción estándar del glifo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M3.00,12.00 A8.5,8.5 0 1,1 20.00,12.00 A8.5,8.5 0 1,1 3.00,12.00 Z
+                           M7.50,9.50 A7,7 0 1,0 21.50,9.50 A7,7 0 1,0 7.50,9.50 Z" />
+</vector>

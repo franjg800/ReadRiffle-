@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Book Room",
+  "short_name": "Book Room",
+  "description": "Tu biblioteca de EPUB: lectura normal y RSVP, subrayados, notas y sincronización con Drive.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09362F",
+  "theme_color": "#09362F",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "categories": ["books", "education", "productivity"]
+}

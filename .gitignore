@@ -1,0 +1,6 @@
+codigo/build/
+codigo/composeApp/build/
+codigo/.gradle/
+codigo/.kotlin/
+codigo/kotlin-js-store/
+.DS_Store
