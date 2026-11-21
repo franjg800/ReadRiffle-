@@ -12,6 +12,34 @@ marcadores, páginas de consulta, índice y búsqueda, estadísticas, cambio de 
 diccionario (Wikcionario), imágenes con IA (Gemini), tienda, bloqueo con portada y sincronización
 con Google Drive (la misma carpeta «ReadRiffle» que usa la app Android).
 
+## Versión de ordenador
+
+Con la ventana a partir de 900 px de ancho la web cambia a un diseño propio de escritorio (no es la
+del móvil estirada):
+
+- **Barra lateral** fija con las cuatro secciones (pastilla que se desliza a la elegida), el estado
+  de Drive y los atajos. Sustituye al dock flotante del móvil.
+- **Biblioteca**: pestañas Leyendo/Leídos en la cabecera, «Continúa leyendo» con las cifras del día
+  al lado, rejilla que se adapta al ancho y portadas que se elevan al pasar el ratón.
+- **Ficha del libro y ficha de Leídos** a dos columnas (portada y acciones a la izquierda; nota,
+  cita y notas de lectores a la derecha).
+- **Lectura** centrada con ancho cómodo. Atajos: ← → / AvPág / Espacio pasan página; en RSVP,
+  Espacio lee o pausa, ← → saltan palabras y ↑ ↓ cambian la velocidad. Esc vuelve.
+- Notas, Tienda y Ajustes centrados con ancho máximo; cursor de mano en todo lo pulsable.
+
+## Primera visita y sesión recordada
+
+- La primera vez aparece un aviso (tarjeta centrada, no pantalla completa) que explica la
+  sincronización y pregunta si se quiere. «Ahora no» no vuelve a preguntar (se puede activar luego
+  en Ajustes › Sincronización).
+- La web recuerda la cuenta conectada. Como Google da a las webs permisos de una hora, al volver a
+  entrar con el permiso caducado la web lo renueva sola con una ida y vuelta a Google sin preguntar
+  nada (como mucho una vez cada 20 minutos).
+- Si Google rechaza la cuenta (no está dada de alta como usuario de prueba, web no registrada, etc.)
+  el aviso vuelve a salir con el error y «contacta con el desarrollador». Si en `config.js` se
+  rellena `contactEmail`, el mensaje dice «escribe a <correo>». Sin ID de cliente configurado, el
+  aviso dice que la sincronización aún no está activada.
+
 Diferencias obligadas por ser una web:
 
 - **Importar libros**: el botón + abre la app Archivos (se pueden elegir varios EPUB a la vez). No
@@ -20,8 +48,8 @@ Diferencias obligadas por ser una web:
   «Importar EPUB descargado». Una web no puede incrustar otras webs con su propio bloqueador.
 - **Bloqueo con portada**: una web no puede pedir la huella o la cara del móvil, así que usa un PIN
   propio de Book Room (Ajustes › Bloqueo).
-- **Drive**: el permiso de Google en una web dura una hora; al sincronizar después, la app hace una
-  ida y vuelta rápida a Google para renovarlo.
+- **Drive**: el permiso de Google en una web dura una hora; la web lo renueva sola al abrirla (ida y
+  vuelta rápida a Google, sin preguntar).
 - **Requisito**: iOS 18.2 o posterior (WebAssembly con recolector de basura).
 
 Los libros y el progreso se guardan en el almacenamiento del navegador de ese dispositivo
