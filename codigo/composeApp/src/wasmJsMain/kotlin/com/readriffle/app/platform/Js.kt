@@ -175,3 +175,6 @@ internal external fun jsInstallFirstTime()
 
 @JsFun("(cb) => window.br.onKey(cb)")
 internal external fun jsOnKey(cb: (String) -> Boolean)
+
+@JsFun("() => window.br.safeBottom()")
+internal external fun jsSafeBottom(): Double

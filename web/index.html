@@ -15,8 +15,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <style>
   html, body { margin: 0; height: 100%; background: #09362F; overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
-  /* La app ocupa la pantalla menos las zonas del notch y de la barra de inicio del iPhone */
-  #app { position: fixed; top: env(safe-area-inset-top, 0px); bottom: env(safe-area-inset-bottom, 0px); left: env(safe-area-inset-left, 0px); right: env(safe-area-inset-right, 0px); }
+  /* La app llega hasta abajo del todo (detrás de la barra de inicio del iPhone); solo deja libre
+     el notch. El hueco de la barra de inicio lo respetan el dock y los controles desde Compose. */
+  #app { position: fixed; top: env(safe-area-inset-top, 0px); left: env(safe-area-inset-left, 0px); right: env(safe-area-inset-right, 0px);
+         height: calc(var(--alto, 100lvh) - env(safe-area-inset-top, 0px)); }
+  #sonda { position: fixed; left: 0; bottom: 0; width: 0; height: env(safe-area-inset-bottom, 0px); visibility: hidden; pointer-events: none; }
   #carga { position: fixed; inset: 0; display: grid; place-items: center; background: #09362F; color: #F4EEE3; z-index: 10; transition: opacity .45s; font-family: -apple-system, system-ui, sans-serif; }
   #carga.fuera { opacity: 0; pointer-events: none; }
   .caja { display: grid; justify-items: center; gap: 18px; padding: 24px; text-align: center; max-width: 320px; }
@@ -33,6 +36,23 @@
 </head>
 <body>
 <div id="app"></div>
+<div id="sonda"></div>
+<script>
+// iOS, con la app instalada, a veces da una ventana más baja que la pantalla real y deja una franja
+// vacía abajo. Se usa el alto real de la pantalla cuando la app está instalada.
+(function () {
+  const ajustar = () => {
+    const inst = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+    const vertical = matchMedia('(orientation: portrait)').matches;
+    const real = vertical ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    const alto = inst && /iPhone|iPad|iPod/.test(navigator.userAgent) ? Math.max(real, innerHeight) : innerHeight;
+    document.documentElement.style.setProperty('--alto', alto + 'px');
+  };
+  ajustar();
+  addEventListener('resize', ajustar);
+  addEventListener('orientationchange', () => setTimeout(ajustar, 300));
+})();
+</script>
 <div id="carga">
   <div class="caja" id="cargando">
     <img src="icono-180.png" alt="">

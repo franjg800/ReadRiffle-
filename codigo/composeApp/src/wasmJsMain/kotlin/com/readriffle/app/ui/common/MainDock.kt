@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.navigationBarsPadding
+import com.readriffle.app.platform.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,7 +58,7 @@ fun MainDock(
     Row(
         modifier = modifier
             .navigationBarsPadding()
-            .padding(bottom = 14.dp)
+            .padding(bottom = 10.dp)
             .shadow(16.dp, RoundedCornerShape(50), ambientColor = Color.Black.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.35f))
             .clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))

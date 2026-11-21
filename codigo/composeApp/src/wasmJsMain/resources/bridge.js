@@ -180,6 +180,8 @@
       const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', c);
       document.body.style.background = c; document.documentElement.style.background = c;
     },
+    // Alto de la barra de inicio del iPhone (px CSS), para que el dock y los controles no la pisen.
+    safeBottom() { const e = document.getElementById('sonda'); return e ? e.getBoundingClientRect().height : 0; },
     keepAwake(on) {
       try {
         if (on && 'wakeLock' in navigator) { navigator.wakeLock.request('screen').then(l => { br._lock = l; }).catch(() => {}); }
