@@ -1,5 +1,6 @@
 package com.readriffle.app.ui.settings
 
+import com.readriffle.app.ui.common.desktopCentered
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -104,7 +105,7 @@ fun SettingsScreen(
     androidx.activity.compose.BackHandler(enabled = page != null) { page = null }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding).desktopCentered(820.dp)) {
             val current = page
             if (current == null) {
                 SettingsHub(

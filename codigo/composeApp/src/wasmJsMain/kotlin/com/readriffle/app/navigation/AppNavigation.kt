@@ -11,6 +11,12 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.background
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.savedstate.read
 import androidx.compose.ui.Alignment
@@ -105,6 +111,44 @@ fun AppNavigation(container: AppContainer) {
         navController.popBackStack()
     }
 
+    // Ordenador: barra lateral fija con las secciones (en vez del dock del móvil). Se esconde al leer.
+    val wide = com.readriffle.app.ui.common.LocalWide.current
+    val route = currentEntry?.destination?.route
+    val showSidebar = wide && route != null && route != Screen.Splash.route && !route.startsWith("reading")
+    val syncState by syncViewModel.uiState.collectAsState()
+    androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showSidebar,
+            enter = androidx.compose.animation.slideInHorizontally { -it } + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutHorizontally { -it } + androidx.compose.animation.fadeOut()
+        ) {
+            com.readriffle.app.ui.common.DesktopSidebar(
+                current = when (route) {
+                    Screen.Library.route -> DockDestination.LIBRARY
+                    Screen.Notes.route -> DockDestination.NOTES
+                    Screen.Store.route -> DockDestination.STORE
+                    Screen.Settings.route -> DockDestination.SETTINGS
+                    else -> null
+                },
+                onSelect = { dest ->
+                    navigateTopLevel(
+                        navController, when (dest) {
+                            DockDestination.LIBRARY -> Screen.Library.route
+                            DockDestination.NOTES -> Screen.Notes.route
+                            DockDestination.STORE -> Screen.Store.route
+                            DockDestination.SETTINGS -> Screen.Settings.route
+                        }
+                    )
+                },
+                syncEmail = syncState.accountEmail,
+                isSyncing = syncState.isSyncing,
+                onSync = {
+                    if (syncState.accountEmail != null) syncViewModel.syncNow()
+                    else navigateTopLevel(navController, Screen.Settings.route)
+                }
+            )
+        }
+        androidx.compose.foundation.layout.Box(Modifier.weight(1f).fillMaxHeight()) {
     NavHost(navController = navController, startDestination = Screen.Splash.route) {
 
         composable(Screen.Splash.route) {
@@ -192,10 +236,22 @@ fun AppNavigation(container: AppContainer) {
                 val viewModel: ReadingViewModel = viewModel(
                     factory = ReadingViewModel.factory(bookId, container, initialChapterIndex, initialWordIndex)
                 )
-                ReadingScreen(
-                    viewModel = viewModel,
-                    onExit = { navController.popBackStack() }
-                )
+                // Ordenador: el texto va en una columna centrada de ancho cómodo de leer.
+                androidx.compose.foundation.layout.Box(
+                    Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.fillMaxHeight().then(
+                            if (com.readriffle.app.ui.common.LocalWide.current) Modifier.widthIn(max = 820.dp) else Modifier.fillMaxSize()
+                        )
+                    ) {
+                        ReadingScreen(
+                            viewModel = viewModel,
+                            onExit = { navController.popBackStack() }
+                        )
+                    }
+                }
             }
         }
 
@@ -249,6 +305,8 @@ fun AppNavigation(container: AppContainer) {
                     )
                 }
             )
+        }
+    }
         }
     }
 }

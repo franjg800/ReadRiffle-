@@ -229,3 +229,22 @@ object AppVisibility {
 
 /** Petición JSONP (para Apple Books, que no admite CORS). Texto JSON o vacío si falla. */
 suspend fun jsonpRequest(url: String): String = jsJsonp(url).await<JsString>().toString()
+
+fun isOnline(): Boolean = jsOnline()
+fun contactEmail(): String = jsContactEmail()
+/** Enseña (solo la primera vez y si no está instalada) el tutorial de instalar en la pantalla de inicio. */
+fun offerInstallFirstTime() = jsInstallFirstTime()
+
+/**
+ * Atajos de teclado del ordenador. Responde el último registrado (la pantalla de lectura activa);
+ * devuelve true si usó la tecla.
+ */
+object KeyShortcuts {
+    private val handlers = mutableListOf<(String) -> Boolean>()
+    private var bound = false
+    fun add(h: (String) -> Boolean) {
+        if (!bound) { bound = true; jsOnKey { key -> handlers.lastOrNull()?.invoke(key) ?: false } }
+        handlers += h
+    }
+    fun remove(h: (String) -> Boolean) { handlers -= h }
+}

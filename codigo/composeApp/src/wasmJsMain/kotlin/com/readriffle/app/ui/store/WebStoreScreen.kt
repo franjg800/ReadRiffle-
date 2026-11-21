@@ -1,5 +1,6 @@
 package com.readriffle.app.ui.store
 
+import com.readriffle.app.ui.common.desktopCentered
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -107,7 +108,7 @@ fun WebStoreScreen(
     }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding).desktopCentered(900.dp)) {
             when (mode) {
                 StoreMode.Home -> StoreHome(
                     stores = stores,

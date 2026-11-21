@@ -32,6 +32,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.animation.togetherWith
 import com.readriffle.app.ui.read.appearIn
+import com.readriffle.app.ui.common.desktopCentered
+import com.readriffle.app.ui.common.hoverLift
+import com.readriffle.app.ui.common.handCursor
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -145,17 +149,24 @@ fun LibraryScreen(
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             val readTab = uiState.tab == com.readriffle.app.viewmodel.LibraryTab.READ
-            Column(Modifier.fillMaxSize()) {
-                // Cabecera fija: título, botón + y selector Leyendo | Leídos.
-                Column(Modifier.padding(horizontal = 20.dp)) {
+            val wide = com.readriffle.app.ui.common.LocalWide.current
+            val sidePad = if (wide) 40.dp else 20.dp
+            Column(Modifier.fillMaxSize().desktopCentered(1320.dp)) {
+                // Cabecera fija: título, botón + y selector Leyendo | Leídos (en ordenador, todo en una fila).
+                Column(Modifier.padding(horizontal = sidePad)) {
                     LibraryHeader(
                         hasFolder = uiState.importFolderUri.isNotBlank(),
                         onAddFile = addFile, onPickFolder = pickFolder,
                         onScanFolder = {},
                         onClearFolder = {},
-                        readTab = readTab
+                        readTab = readTab,
+                        tabs = if (wide) ({
+                            Box(Modifier.width(400.dp).padding(end = 18.dp)) {
+                                LibraryTabs(uiState.tab, uiState.readingBooks.size, uiState.readEntries.size, viewModel::selectTab)
+                            }
+                        }) else null
                     )
-                    LibraryTabs(uiState.tab, uiState.readingBooks.size, uiState.readEntries.size, viewModel::selectTab)
+                    if (!wide) LibraryTabs(uiState.tab, uiState.readingBooks.size, uiState.readEntries.size, viewModel::selectTab)
                 }
                 androidx.compose.animation.AnimatedContent(
                     targetState = uiState.tab,
@@ -177,6 +188,7 @@ fun LibraryScreen(
                             uiState.isLoading && uiState.books.isEmpty() && uiState.readEntries.isEmpty() ->
                                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                             tab == com.readriffle.app.viewmodel.LibraryTab.READ -> ReadShelf(
+                                wide = wide,
                                 entries = uiState.readEntries,
                                 onOpen = onOpenRead,
                                 onAdd = { addingRead = true }
@@ -189,26 +201,46 @@ fun LibraryScreen(
                                 val full: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
 
                                 LazyVerticalGrid(
-                                    columns = GridCells.Fixed(3),
-                                    contentPadding = PaddingValues(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 120.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                                    columns = if (wide) GridCells.Adaptive(168.dp) else GridCells.Fixed(3),
+                                    contentPadding = PaddingValues(start = sidePad, top = 8.dp, end = sidePad, bottom = if (wide) 48.dp else 120.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(if (wide) 26.dp else 14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(if (wide) 28.dp else 18.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
                                     // --- "Hoy": continuar leyendo, ritmo y último subrayado -----------------
-                                    uiState.currentBook?.let { current ->
+                                    val current = uiState.currentBook
+                                    if (wide && current != null) {
+                                        // Ordenador: "Continúa leyendo" y las cifras del día, lado a lado.
                                         item(span = full) {
-                                            Box(Modifier.appearIn(0, "hero", seenTiles)) {
-                                                CurrentlyReadingHero(
-                                                    meta = current,
-                                                    wpm = uiState.lastWpm,
-                                                    onContinue = { onContinue(current.id) },
-                                                    onLock = { onLockCover(current) }
-                                                )
+                                            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                                                Box(Modifier.weight(2.2f).appearIn(0, "hero", seenTiles)) {
+                                                    CurrentlyReadingHero(
+                                                        meta = current,
+                                                        wpm = uiState.lastWpm,
+                                                        onContinue = { onContinue(current.id) },
+                                                        onLock = { onLockCover(current) }
+                                                    )
+                                                }
+                                                Box(Modifier.weight(1f).appearIn(1, "stats", seenTiles)) {
+                                                    StatsStrip(uiState.stats, onClick = onOpenStats, vertical = true)
+                                                }
                                             }
                                         }
+                                    } else {
+                                        current?.let { cur ->
+                                            item(span = full) {
+                                                Box(Modifier.appearIn(0, "hero", seenTiles)) {
+                                                    CurrentlyReadingHero(
+                                                        meta = cur,
+                                                        wpm = uiState.lastWpm,
+                                                        onContinue = { onContinue(cur.id) },
+                                                        onLock = { onLockCover(cur) }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        item(span = full) { Box(Modifier.appearIn(1, "stats", seenTiles)) { StatsStrip(uiState.stats, onClick = onOpenStats) } }
                                     }
-                                    item(span = full) { Box(Modifier.appearIn(1, "stats", seenTiles)) { StatsStrip(uiState.stats, onClick = onOpenStats) } }
                                     item(span = full) {
                                         LibrarySectionLabel(
                                             text = stringResource(R.string.library_section_all),
@@ -307,7 +339,8 @@ private fun LibraryHeader(
     onPickFolder: () -> Unit,
     onScanFolder: () -> Unit,
     onClearFolder: () -> Unit,
-    readTab: Boolean = false
+    readTab: Boolean = false,
+    tabs: (@Composable () -> Unit)? = null
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -315,6 +348,7 @@ private fun LibraryHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         ScreenTitle(text = stringResource(R.string.library_title), modifier = Modifier.weight(1f))
+        tabs?.invoke()
         val addBookDescription = stringResource(R.string.library_add_book)
         Box {
             Icon(
@@ -323,6 +357,7 @@ private fun LibraryHeader(
                 tint = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier
                     .size(36.dp)
+                    .hoverLift(RoundedCornerShape(10.dp), lift = 1.12f, elevation = 0.dp)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onAddFile() }
                     .semantics { contentDescription = addBookDescription }
             )
@@ -433,7 +468,16 @@ private fun CurrentlyReadingHero(meta: BookMeta, wpm: Int, onContinue: () -> Uni
 
 /** Tres cifras de ritmo (hoy / racha / semana); al tocarlas se abren las estadísticas completas. */
 @Composable
-private fun StatsStrip(stats: StatsSummary, onClick: () -> Unit) {
+private fun StatsStrip(stats: StatsSummary, onClick: () -> Unit, vertical: Boolean = false) {
+    if (vertical) {
+        // Ordenador: las tres cifras apiladas junto a la tarjeta de "Continúa leyendo".
+        Column(Modifier.fillMaxWidth().clickable(onClick = onClick).handCursor(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatRow("Hoy", formatMinutes(stats.todaySeconds))
+            StatRow("Racha", if (stats.streak == 1) "1 día" else "${stats.streak} días")
+            StatRow("Semana", formatWords(stats.weekWords))
+        }
+        return
+    }
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -441,6 +485,19 @@ private fun StatsStrip(stats: StatsSummary, onClick: () -> Unit) {
         StatCell("Hoy", formatMinutes(stats.todaySeconds), Modifier.weight(1f))
         StatCell("Racha", if (stats.streak == 1) "1 día" else "${stats.streak} días", Modifier.weight(1f))
         StatCell("Semana", formatWords(stats.weekWords), Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun StatRow(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().height(58.dp).hoverLift(RoundedCornerShape(18.dp), lift = 1.02f, elevation = 10.dp)
+            .clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface).padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
     }
 }
 
@@ -502,7 +559,7 @@ internal fun BookCoverImage(meta: BookMeta, modifier: Modifier = Modifier) {
 @Composable
 private fun CoverTile(meta: BookMeta, onClick: () -> Unit, onLongClick: () -> Unit) {
     Column(modifier = Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp))) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).hoverLift(RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))) {
             BookCoverImage(meta, Modifier.fillMaxSize())
             if (meta.progressFraction > 0.005f) {
                 Box(
@@ -659,6 +716,7 @@ private fun LibraryTabs(
  */
 @Composable
 private fun ReadShelf(
+    wide: Boolean = false,
     entries: List<com.readriffle.app.data.ratings.ReadEntry>,
     onOpen: (String) -> Unit,
     onAdd: () -> Unit
@@ -693,15 +751,16 @@ private fun ReadShelf(
         }
         return
     }
+    val sidePad = if (wide) 40.dp else 20.dp
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        contentPadding = PaddingValues(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 120.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        columns = if (wide) GridCells.Adaptive(168.dp) else GridCells.Fixed(3),
+        contentPadding = PaddingValues(start = sidePad, top = 8.dp, end = sidePad, bottom = if (wide) 48.dp else 120.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (wide) 26.dp else 14.dp),
+        verticalArrangement = Arrangement.spacedBy(if (wide) 28.dp else 18.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         item(span = full) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.then(if (wide) Modifier.widthIn(max = 720.dp) else Modifier), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val year = com.readriffle.app.ui.read.animatedNumber(stats.thisYear.toFloat())
                 val total = com.readriffle.app.ui.read.animatedNumber(stats.total.toFloat(), delayMs = 80)
                 val avg = com.readriffle.app.ui.read.animatedNumber((stats.averageHalfStars ?: 0f) / 2f, delayMs = 160)
@@ -732,6 +791,7 @@ private fun ReadShelf(
                         com.readriffle.app.ui.read.ReadCover(
                             e.title, e.coverPath,
                             Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+                                .hoverLift(RoundedCornerShape(10.dp))
                                 .shadow(6.dp, RoundedCornerShape(10.dp))
                                 .clip(RoundedCornerShape(10.dp))
                         )

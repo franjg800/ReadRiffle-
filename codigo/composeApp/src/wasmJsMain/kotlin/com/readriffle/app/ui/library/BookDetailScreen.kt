@@ -2,6 +2,7 @@ package com.readriffle.app.ui.library
 
 import com.readriffle.app.platform.System
 import com.readriffle.app.platform.shareText
+import com.readriffle.app.ui.common.desktopCentered
 import com.readriffle.app.platform.formatInt
 import com.readriffle.app.platform.SimpleDateFormat
 import androidx.compose.runtime.rememberCoroutineScope
@@ -137,6 +138,7 @@ private fun BookDetailContent(
     val finished = book.progressFraction >= 0.99f
     val started = book.progressFraction > 0f || book.lastOpenedAtMillis > 0L
     val primary = MaterialTheme.colorScheme.primary
+    val wide = com.readriffle.app.ui.common.LocalWide.current
 
     // Fondo: un resplandor del color de acento que se funde con el fondo.
     Box(
@@ -147,166 +149,341 @@ private fun BookDetailContent(
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding()
-            .padding(bottom = 32.dp)
+            .padding(bottom = 32.dp).then(Modifier.desktopCentered(1120.dp))
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            RoundIconButton(R.drawable.ic_arrow_back, stringResource(R.string.book_detail_back), onBack)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RoundIconButton(R.drawable.ic_edit, "Editar título y autor") { editing = true }
-                RoundIconButton(R.drawable.ic_share, stringResource(R.string.book_detail_share)) {
-                    val text = context.getString(R.string.book_detail_share_text, book.title, book.author, pct)
-                    scope.launch { shareText(text, book.title) }
-                }
-            }
-        }
-
-        // Portada grande
-        Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
-            Box(
-                Modifier.fillMaxWidth(0.58f).aspectRatio(2f / 3f)
-                    .shadow(28.dp, RoundedCornerShape(18.dp), ambientColor = primary, spotColor = primary)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(onClick = onChangeCover)
-            ) {
-                if (book.coverPath != null) {
-                    AsyncImage(
-                        model = File(book.coverPath), contentDescription = book.title,
-                        modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(primary.copy(alpha = 0.5f), primary.copy(alpha = 0.15f))))
-                            .padding(18.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            book.title, fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 24.sp,
-                            textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground, maxLines = 5, overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        }
-
-        Box(Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
-            Row(
-                Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
-                    .clickable(onClick = onChangeCover).padding(horizontal = 16.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(painterResource(R.drawable.ic_cover_image), null, tint = primary, modifier = Modifier.size(16.dp))
-                Text("Cambiar portada", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-            }
-        }
-
-        Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(top = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                book.title, modifier = Modifier.fillMaxWidth(), fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold,
-                fontSize = 30.sp, lineHeight = 36.sp, textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onBackground, maxLines = 4, overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                book.author, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-            )
-        }
-
-        // Progreso
-        Column(Modifier.padding(horizontal = 28.dp).padding(top = 28.dp)) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("$pct%", fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 44.sp, lineHeight = 48.sp, color = primary)
-                Text(
-                    if (finished) stringResource(R.string.book_detail_finished) else stringResource(R.string.book_detail_read_pct),
-                    fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)
-                )
-            }
-            Box(
-                Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
-            ) {
-                Box(Modifier.fillMaxWidth(book.progressFraction.coerceIn(0f, 1f)).height(6.dp).clip(RoundedCornerShape(3.dp)).background(primary))
-            }
-            Text(
-                stringResource(R.string.book_detail_chapter_of, (book.lastChapterIndex + 1).coerceAtMost(book.chapterCount.coerceAtLeast(1)), book.chapterCount),
-                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp)
-            )
-        }
-
-        // Estadísticas
-        val remaining = bookMinutesRemaining(book, wpm)
-        val totalMinutes = if (book.totalWordCount > 0 && wpm > 0) ceil(book.totalWordCount.toFloat() / wpm).toInt() else 0
-        val stats = listOf(
-            stringResource(R.string.book_detail_stat_remaining) to if (finished) "—" else if (remaining > 0) formatRemainingTime(remaining) else "—",
-            stringResource(R.string.book_detail_stat_total) to if (totalMinutes > 0) formatRemainingTime(totalMinutes) else "—",
-            stringResource(R.string.book_detail_stat_chapters) to book.chapterCount.toString(),
-            stringResource(R.string.book_detail_stat_words) to if (book.totalWordCount > 0) formatInt(book.totalWordCount) else "—",
-            stringResource(R.string.book_detail_stat_highlights) to book.highlights.size.toString(),
-            stringResource(R.string.book_detail_stat_notes) to book.notes.size.toString(),
-            stringResource(R.string.book_detail_stat_bookmarks) to book.bookmarks.size.toString(),
-            stringResource(R.string.book_detail_stat_speed) to stringResource(R.string.book_detail_wpm_value, wpm)
-        )
-        Column(Modifier.padding(horizontal = 20.dp).padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            stats.chunked(2).forEach { row ->
+        if (!wide) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                RoundIconButton(R.drawable.ic_arrow_back, stringResource(R.string.book_detail_back), onBack)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { (label, value) -> StatTile(label, value, Modifier.weight(1f)) }
+                    RoundIconButton(R.drawable.ic_edit, "Editar título y autor") { editing = true }
+                    RoundIconButton(R.drawable.ic_share, stringResource(R.string.book_detail_share)) {
+                        val text = context.getString(R.string.book_detail_share_text, book.title, book.author, pct)
+                        scope.launch { shareText(text, book.title) }
+                    }
                 }
             }
-        }
 
-        // Fechas
-        val dateFmt = remember { SimpleDateFormat("d MMM yyyy") }
-        Column(Modifier.padding(horizontal = 28.dp).padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                stringResource(R.string.book_detail_added, dateFmt.format(Date(book.addedAtMillis))),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (book.lastOpenedAtMillis > 0L) Text(
-                stringResource(R.string.book_detail_last_read, dateFmt.format(Date(book.lastOpenedAtMillis))),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+            // Portada grande
+            Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.fillMaxWidth(if (wide) 1f else 0.58f).aspectRatio(2f / 3f)
+                        .shadow(28.dp, RoundedCornerShape(18.dp), ambientColor = primary, spotColor = primary)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable(onClick = onChangeCover)
+                ) {
+                    if (book.coverPath != null) {
+                        AsyncImage(
+                            model = File(book.coverPath), contentDescription = book.title,
+                            modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            Modifier.fillMaxSize().background(Brush.linearGradient(listOf(primary.copy(alpha = 0.5f), primary.copy(alpha = 0.15f))))
+                                .padding(18.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                book.title, fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 24.sp,
+                                textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground, maxLines = 5, overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
 
-        // Acciones
-        Column(Modifier.padding(horizontal = 20.dp).padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(primary)
-                    .clickable { onRead(book.id) }.padding(vertical = 17.dp),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                Row(
+                    Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                        .clickable(onClick = onChangeCover).padding(horizontal = 16.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(painterResource(R.drawable.ic_cover_image), null, tint = primary, modifier = Modifier.size(16.dp))
+                    Text("Cambiar portada", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+
+            Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(top = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    stringResource(if (started && !finished) R.string.book_detail_continue else if (finished) R.string.book_detail_continue else R.string.book_detail_start),
-                    fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary
+                    book.title, modifier = Modifier.fillMaxWidth(), fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold,
+                    fontSize = 30.sp, lineHeight = 36.sp, textAlign = if (wide) TextAlign.Start else TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onBackground, maxLines = 4, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    book.author, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = if (wide) TextAlign.Start else TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 )
             }
-            // Leídos: marcar como leído o, si ya lo está, ver su ficha (tu nota frente a la de los lectores).
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                    .background(if (book.isFinished) primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface)
-                    .clickable(onClick = onMarkRead).padding(horizontal = 18.dp, vertical = 15.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                if (book.isFinished) {
-                    Text("Leído", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = primary)
-                    val stars = book.finished?.rating ?: 0
-                    if (stars > 0) {
-                        androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
-                        com.readriffle.app.ui.read.StarRating(stars, size = 16.dp, spacing = 2.dp)
+
+            // Progreso
+            Column(Modifier.padding(horizontal = 28.dp).padding(top = 28.dp)) {
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("$pct%", fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 44.sp, lineHeight = 48.sp, color = primary)
+                    Text(
+                        if (finished) stringResource(R.string.book_detail_finished) else stringResource(R.string.book_detail_read_pct),
+                        fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+                Box(
+                    Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
+                ) {
+                    Box(Modifier.fillMaxWidth(book.progressFraction.coerceIn(0f, 1f)).height(6.dp).clip(RoundedCornerShape(3.dp)).background(primary))
+                }
+                Text(
+                    stringResource(R.string.book_detail_chapter_of, (book.lastChapterIndex + 1).coerceAtMost(book.chapterCount.coerceAtLeast(1)), book.chapterCount),
+                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp)
+                )
+            }
+
+            // Estadísticas
+            val remaining = bookMinutesRemaining(book, wpm)
+            val totalMinutes = if (book.totalWordCount > 0 && wpm > 0) ceil(book.totalWordCount.toFloat() / wpm).toInt() else 0
+            val stats = listOf(
+                stringResource(R.string.book_detail_stat_remaining) to if (finished) "—" else if (remaining > 0) formatRemainingTime(remaining) else "—",
+                stringResource(R.string.book_detail_stat_total) to if (totalMinutes > 0) formatRemainingTime(totalMinutes) else "—",
+                stringResource(R.string.book_detail_stat_chapters) to book.chapterCount.toString(),
+                stringResource(R.string.book_detail_stat_words) to if (book.totalWordCount > 0) formatInt(book.totalWordCount) else "—",
+                stringResource(R.string.book_detail_stat_highlights) to book.highlights.size.toString(),
+                stringResource(R.string.book_detail_stat_notes) to book.notes.size.toString(),
+                stringResource(R.string.book_detail_stat_bookmarks) to book.bookmarks.size.toString(),
+                stringResource(R.string.book_detail_stat_speed) to stringResource(R.string.book_detail_wpm_value, wpm)
+            )
+            Column(Modifier.padding(horizontal = 20.dp).padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                stats.chunked(if (wide) 4 else 2).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEach { (label, value) -> StatTile(label, value, Modifier.weight(1f)) }
                     }
-                    Text("  ·  Ver ficha", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Text("Marcar como leído", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+
+            // Fechas
+            val dateFmt = remember { SimpleDateFormat("d MMM yyyy") }
+            Column(Modifier.padding(horizontal = 28.dp).padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    stringResource(R.string.book_detail_added, dateFmt.format(Date(book.addedAtMillis))),
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (book.lastOpenedAtMillis > 0L) Text(
+                    stringResource(R.string.book_detail_last_read, dateFmt.format(Date(book.lastOpenedAtMillis))),
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Acciones
+            Column(Modifier.padding(horizontal = 20.dp).padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(
-                    Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface)
-                        .clickable { confirmDelete = true }.padding(vertical = 15.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(primary)
+                        .clickable { onRead(book.id) }.padding(vertical = 17.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(stringResource(R.string.book_detail_delete), fontSize = 15.sp, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        stringResource(if (started && !finished) R.string.book_detail_continue else if (finished) R.string.book_detail_continue else R.string.book_detail_start),
+                        fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                // Leídos: marcar como leído o, si ya lo está, ver su ficha (tu nota frente a la de los lectores).
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                        .background(if (book.isFinished) primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface)
+                        .clickable(onClick = onMarkRead).padding(horizontal = 18.dp, vertical = 15.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (book.isFinished) {
+                        Text("Leído", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = primary)
+                        val stars = book.finished?.rating ?: 0
+                        if (stars > 0) {
+                            androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
+                            com.readriffle.app.ui.read.StarRating(stars, size = 16.dp, spacing = 2.dp)
+                        }
+                        Text("  ·  Ver ficha", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Text("Marcar como leído", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(
+                        Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface)
+                            .clickable { confirmDelete = true }.padding(vertical = 15.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(stringResource(R.string.book_detail_delete), fontSize = 15.sp, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+        } else {
+            // Ordenador: portada y acciones en una columna fija a la izquierda; datos a la derecha.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                RoundIconButton(R.drawable.ic_arrow_back, stringResource(R.string.book_detail_back), onBack)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    RoundIconButton(R.drawable.ic_edit, "Editar título y autor") { editing = true }
+                    RoundIconButton(R.drawable.ic_share, stringResource(R.string.book_detail_share)) {
+                        val text = context.getString(R.string.book_detail_share_text, book.title, book.author, pct)
+                        scope.launch { shareText(text, book.title) }
+                    }
+                }
+            }
+
+
+            Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp), horizontalArrangement = Arrangement.spacedBy(44.dp)) {
+                Column(Modifier.width(320.dp)) {
+                    // Portada grande
+                    Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            Modifier.fillMaxWidth(if (wide) 1f else 0.58f).aspectRatio(2f / 3f)
+                                .shadow(28.dp, RoundedCornerShape(18.dp), ambientColor = primary, spotColor = primary)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable(onClick = onChangeCover)
+                        ) {
+                            if (book.coverPath != null) {
+                                AsyncImage(
+                                    model = File(book.coverPath), contentDescription = book.title,
+                                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Box(
+                                    Modifier.fillMaxSize().background(Brush.linearGradient(listOf(primary.copy(alpha = 0.5f), primary.copy(alpha = 0.15f))))
+                                        .padding(18.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        book.title, fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 24.sp,
+                                        textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground, maxLines = 5, overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Box(Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                        Row(
+                            Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                                .clickable(onClick = onChangeCover).padding(horizontal = 16.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(painterResource(R.drawable.ic_cover_image), null, tint = primary, modifier = Modifier.size(16.dp))
+                            Text("Cambiar portada", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
+                    // Acciones
+                    Column(Modifier.padding(horizontal = 20.dp).padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(primary)
+                                .clickable { onRead(book.id) }.padding(vertical = 17.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                stringResource(if (started && !finished) R.string.book_detail_continue else if (finished) R.string.book_detail_continue else R.string.book_detail_start),
+                                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                        // Leídos: marcar como leído o, si ya lo está, ver su ficha (tu nota frente a la de los lectores).
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                                .background(if (book.isFinished) primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface)
+                                .clickable(onClick = onMarkRead).padding(horizontal = 18.dp, vertical = 15.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (book.isFinished) {
+                                Text("Leído", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = primary)
+                                val stars = book.finished?.rating ?: 0
+                                if (stars > 0) {
+                                    androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
+                                    com.readriffle.app.ui.read.StarRating(stars, size = 16.dp, spacing = 2.dp)
+                                }
+                                Text("  ·  Ver ficha", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                Text("Marcar como leído", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Box(
+                                Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface)
+                                    .clickable { confirmDelete = true }.padding(vertical = 15.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(stringResource(R.string.book_detail_delete), fontSize = 15.sp, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+
+                }
+                Column(Modifier.weight(1f).padding(top = 8.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(top = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            book.title, modifier = Modifier.fillMaxWidth(), fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold,
+                            fontSize = 30.sp, lineHeight = 36.sp, textAlign = if (wide) TextAlign.Start else TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onBackground, maxLines = 4, overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            book.author, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = if (wide) TextAlign.Start else TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        )
+                    }
+
+                    // Progreso
+                    Column(Modifier.padding(horizontal = 28.dp).padding(top = 28.dp)) {
+                        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("$pct%", fontFamily = TitleDisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 44.sp, lineHeight = 48.sp, color = primary)
+                            Text(
+                                if (finished) stringResource(R.string.book_detail_finished) else stringResource(R.string.book_detail_read_pct),
+                                fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                        Box(
+                            Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp))
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
+                        ) {
+                            Box(Modifier.fillMaxWidth(book.progressFraction.coerceIn(0f, 1f)).height(6.dp).clip(RoundedCornerShape(3.dp)).background(primary))
+                        }
+                        Text(
+                            stringResource(R.string.book_detail_chapter_of, (book.lastChapterIndex + 1).coerceAtMost(book.chapterCount.coerceAtLeast(1)), book.chapterCount),
+                            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp)
+                        )
+                    }
+
+                    // Estadísticas
+                    val remaining = bookMinutesRemaining(book, wpm)
+                    val totalMinutes = if (book.totalWordCount > 0 && wpm > 0) ceil(book.totalWordCount.toFloat() / wpm).toInt() else 0
+                    val stats = listOf(
+                        stringResource(R.string.book_detail_stat_remaining) to if (finished) "—" else if (remaining > 0) formatRemainingTime(remaining) else "—",
+                        stringResource(R.string.book_detail_stat_total) to if (totalMinutes > 0) formatRemainingTime(totalMinutes) else "—",
+                        stringResource(R.string.book_detail_stat_chapters) to book.chapterCount.toString(),
+                        stringResource(R.string.book_detail_stat_words) to if (book.totalWordCount > 0) formatInt(book.totalWordCount) else "—",
+                        stringResource(R.string.book_detail_stat_highlights) to book.highlights.size.toString(),
+                        stringResource(R.string.book_detail_stat_notes) to book.notes.size.toString(),
+                        stringResource(R.string.book_detail_stat_bookmarks) to book.bookmarks.size.toString(),
+                        stringResource(R.string.book_detail_stat_speed) to stringResource(R.string.book_detail_wpm_value, wpm)
+                    )
+                    Column(Modifier.padding(horizontal = 20.dp).padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        stats.chunked(if (wide) 4 else 2).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                row.forEach { (label, value) -> StatTile(label, value, Modifier.weight(1f)) }
+                            }
+                        }
+                    }
+
+                    // Fechas
+                    val dateFmt = remember { SimpleDateFormat("d MMM yyyy") }
+                    Column(Modifier.padding(horizontal = 28.dp).padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            stringResource(R.string.book_detail_added, dateFmt.format(Date(book.addedAtMillis))),
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (book.lastOpenedAtMillis > 0L) Text(
+                            stringResource(R.string.book_detail_last_read, dateFmt.format(Date(book.lastOpenedAtMillis))),
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+
                 }
             }
         }

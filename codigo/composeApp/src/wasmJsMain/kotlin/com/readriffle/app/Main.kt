@@ -9,6 +9,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -45,6 +47,8 @@ fun main() {
         Vfs.init()
         val container = AppContainer()
         container.driveAuthManager.captureRedirect()
+        // Cuenta recordada con el permiso caducado: se renueva solo (ida y vuelta a Google sin preguntar).
+        if (container.driveAuthManager.renewOnStartupIfNeeded()) return@launch
         container.coverLock.restore(container.libraryRepository)
         ComposeViewport(document.getElementById("app")!!) {
             RsvpApp(container)
@@ -62,7 +66,10 @@ private fun RsvpApp(container: AppContainer) {
         }
     }
 
-    CompositionLocalProvider(LocalViewModelStoreOwner provides owner) {
+    val windowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val wide = with(density) { windowInfo.containerSize.width.toDp() } >= com.readriffle.app.ui.common.WIDE_BREAKPOINT
+    CompositionLocalProvider(LocalViewModelStoreOwner provides owner, com.readriffle.app.ui.common.LocalWide provides wide) {
         RsvpReaderTheme(
             themeMode = ThemeMode.fromKey(prefs.themeMode),
             themeVariant = ThemeVariant.fromKey(prefs.themeVariantKey),
@@ -94,8 +101,30 @@ private fun RsvpApp(container: AppContainer) {
                     )
                 }
 
+                // Primera visita: aviso de sincronización con Google Drive (¿sí o no?).
+                val auth = container.driveAuthManager
+                var welcomeDone by remember { mutableStateOf((auth.welcomeShown() || auth.lastSignedInAccount() != null) && auth.startupError == null) }
+                var welcomeError by remember { mutableStateOf(auth.startupError) }
+                if (!welcomeDone) {
+                    com.readriffle.app.ui.common.SyncWelcomeDialog(
+                        error = welcomeError,
+                        onAccept = {
+                            val err = auth.startSignIn(silent = false)
+                            if (err == null) auth.markWelcomeShown() else welcomeError = err
+                        },
+                        onDecline = { auth.markWelcomeShown(); welcomeDone = true }
+                    )
+                }
+                // Cuando ya no queda ningún aviso de bienvenida, se ofrece instalarla en la pantalla de inicio.
+                LaunchedEffect(welcomeDone, prefs.geminiKeyPromptShown) {
+                    if (welcomeDone && prefs.geminiKeyPromptShown) {
+                        kotlinx.coroutines.delay(1200)
+                        com.readriffle.app.platform.offerInstallFirstTime()
+                    }
+                }
+
                 // Pregunta por la API key de Gemini una sola vez (ver [GeminiApiKeyPromptDialog]).
-                if (!prefs.geminiKeyPromptShown) {
+                if (welcomeDone && !prefs.geminiKeyPromptShown) {
                     GeminiApiKeyPromptDialog(
                         onSave = { key ->
                             scope.launch {

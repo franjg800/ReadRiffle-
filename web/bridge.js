@@ -228,6 +228,18 @@
     if (br._volver && br._activo) br._volver();
     setTimeout(() => { if (br._activo && !br._puesto) { history.pushState({ br: 1 }, ''); br._puesto = true; } }, 60);
   });
+  // Atajos de teclado (ordenador): flechas, espacio, re/av pág. La app decide qué hace con cada tecla.
+  br.onKey = function (cb) { br._key = cb; };
+  addEventListener('keydown', e => {
+    if (!br._key || e.ctrlKey || e.metaKey || e.altKey) return;
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return;
+    const ins = document.getElementById('ins');
+    if (ins && !ins.hidden) return;
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'PageUp', 'PageDown'].indexOf(e.key) < 0) return;
+    try { if (br._key(e.key)) { e.preventDefault(); e.stopPropagation(); } } catch (err) { console.error(err); }
+  }, true);
+
   addEventListener('keydown', e => {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
     const ins = document.getElementById('ins');

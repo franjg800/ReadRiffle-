@@ -64,7 +64,6 @@ if (!gc) {
       o.disconnect();
       setTimeout(() => {
         document.getElementById('carga').classList.add('fuera');
-        window.bookroomInstalar && window.bookroomInstalar.primeraVez();
       }, 350);
     }
   }).observe(document.getElementById('app'), { childList: true, subtree: true });

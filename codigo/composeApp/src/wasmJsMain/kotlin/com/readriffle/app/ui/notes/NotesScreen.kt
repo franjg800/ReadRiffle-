@@ -1,5 +1,6 @@
 package com.readriffle.app.ui.notes
 
+import com.readriffle.app.ui.common.desktopCentered
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -78,7 +79,7 @@ fun NotesScreen(
     }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding).desktopCentered(900.dp)) {
             when {
                 uiState.isLoading -> CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),

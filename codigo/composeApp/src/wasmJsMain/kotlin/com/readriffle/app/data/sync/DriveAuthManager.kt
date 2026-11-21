@@ -3,6 +3,8 @@ package com.readriffle.app.data.sync
 import com.readriffle.app.platform.SimplePrefs
 import com.readriffle.app.platform.System
 import com.readriffle.app.platform.appOrigin
+import com.readriffle.app.platform.contactEmail
+import com.readriffle.app.platform.isOnline
 import com.readriffle.app.platform.httpRequest
 import com.readriffle.app.platform.jsConfiguredClientId
 import com.readriffle.app.platform.jsOauthCapture
@@ -62,18 +64,56 @@ class DriveAuthManager {
             prefs.putBoolean("connected", true)
             RedirectResult(true, null)
         } else {
-            RedirectResult(false, describeError(error))
+            val msg = describeError(error)
+            // Si fallaba una renovación silenciosa no se molesta con un aviso (se verá en Ajustes).
+            if (!prefs.getBoolean("last_silent", false)) startupError = msg
+            RedirectResult(false, msg)
         }
     }
 
+    /**
+     * Error de la vuelta desde Google cuando el usuario pidió conectar (p. ej. su cuenta no está
+     * dada de alta): la app vuelve a enseñar el aviso de sincronización con este mensaje.
+     */
+    var startupError: String? = null
+        private set
+
     fun consumeRedirectResult(): RedirectResult? = redirectResult.also { redirectResult = null }
 
+    private fun contact(): String = contactEmail().let { if (it.isBlank()) "contacta con el desarrollador" else "escribe a $it" }
+
     private fun describeError(code: String) = when (code) {
-        "access_denied" -> "Has cancelado el permiso de Google."
+        "access_denied" -> "Google no ha dado permiso. Si lo cancelaste, vuelve a intentarlo. Si Google te dijo que no tienes acceso o que la app no está verificada, tu cuenta aún no está dada de alta: ${contact()} para que te añada."
         "interaction_required", "login_required", "consent_required" -> "Tienes que volver a entrar en tu cuenta de Google: pulsa Conectar."
-        "redirect_uri_mismatch" -> "Google no reconoce esta web. Añade ${webOrigin()} en Google Cloud (orígenes y URI de redirección)."
-        else -> "Google devolvió un error: $code"
+        "redirect_uri_mismatch" -> "Google no reconoce esta web (${webOrigin()}). ${contact().replaceFirstChar { it.uppercase() }}."
+        "invalid_client", "unauthorized_client" -> "La sincronización de esta web está mal configurada. ${contact().replaceFirstChar { it.uppercase() }}."
+        "org_internal", "admin_policy_enforced" -> "Tu cuenta de Google no puede usar esta app. ${contact().replaceFirstChar { it.uppercase() }}."
+        else -> "Google devolvió un error ($code). ${contact().replaceFirstChar { it.uppercase() }}."
     }
+
+    /** Texto para cuando la web aún no tiene ID de cliente de Google. */
+    fun notConfiguredMessage(): String = "La sincronización con Google Drive todavía no está activada en esta web. ${contact().replaceFirstChar { it.uppercase() }}."
+
+    /** ¿Se recuerda una cuenta conectada pero su permiso de una hora ha caducado? */
+    fun needsRenewal(): Boolean = prefs.getBoolean("connected", false) && !hasValidToken()
+
+    /**
+     * Al abrir la web: si hay cuenta conectada pero el permiso caducó, se renueva solo con una ida
+     * y vuelta a Google (sin preguntar nada). Como mucho una vez cada 20 minutos, y solo con
+     * conexión, para no quedarse en bucle si Google pide volver a entrar.
+     * Devuelve true si la página va a salir hacia Google.
+     */
+    fun renewOnStartupIfNeeded(): Boolean {
+        if (!needsRenewal() || !isOnline() || clientId().isBlank()) return false
+        val last = prefs.getLong("silent_at", 0L)
+        if (System.currentTimeMillis() - last < 20 * 60_000L) return false
+        prefs.putLong("silent_at", System.currentTimeMillis())
+        return startSignIn(silent = true) == null
+    }
+
+    /** Primera visita: ¿se ha enseñado ya el aviso de sincronización? */
+    fun welcomeShown(): Boolean = prefs.getBoolean("welcome_shown", false)
+    fun markWelcomeShown() = prefs.putBoolean("welcome_shown", true)
 
     fun lastSignedInAccount(): DriveAccount? =
         if (prefs.getBoolean("connected", false)) DriveAccount(prefs.getString("email", null)) else null
@@ -84,7 +124,8 @@ class DriveAuthManager {
     /** Va a Google para conectar la cuenta (o renovar el permiso si [silent]). La página se recarga al volver. */
     fun startSignIn(silent: Boolean = false): String? {
         val id = clientId()
-        if (id.isBlank()) return "Falta el ID de cliente web de Google: pégalo en Ajustes › Sincronización."
+        if (id.isBlank()) return notConfiguredMessage()
+        prefs.putBoolean("last_silent", silent)
         jsOauthStart(id, SCOPES, if (silent) "none" else "consent", prefs.getString("email", null))
         return null
     }

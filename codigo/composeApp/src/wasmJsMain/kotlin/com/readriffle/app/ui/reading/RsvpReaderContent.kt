@@ -85,6 +85,23 @@ fun RsvpReaderContent(
     val backgroundAlpha = if (uiState.isPlaying) 0.16f else 0.08f
     val holdToRead = !uiState.backgroundMotionAuto
 
+    // Ordenador: Espacio lee/pausa, ← → saltan palabras, ↑ ↓ cambian la velocidad.
+    val wpmNow = androidx.compose.runtime.rememberUpdatedState(uiState.wpm)
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val handler: (String) -> Boolean = { key ->
+            when (key) {
+                " " -> { viewModel.togglePlayPause(); true }
+                "ArrowRight" -> { viewModel.skipWordsForward(); true }
+                "ArrowLeft" -> { viewModel.skipWordsBackward(); true }
+                "ArrowUp" -> { viewModel.setWpm(wpmNow.value + 10); true }
+                "ArrowDown" -> { viewModel.setWpm(wpmNow.value - 10); true }
+                else -> false
+            }
+        }
+        com.readriffle.app.platform.KeyShortcuts.add(handler)
+        onDispose { com.readriffle.app.platform.KeyShortcuts.remove(handler) }
+    }
+
     val swipeThresholdPx = with(density) { 56.dp.toPx() }
     var forwardFlash by remember { mutableIntStateOf(0) }
     var backFlash by remember { mutableIntStateOf(0) }

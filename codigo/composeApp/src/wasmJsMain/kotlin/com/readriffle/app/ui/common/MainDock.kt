@@ -51,6 +51,9 @@ fun MainDock(
     onSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // En ordenador la navegación va en la barra lateral (ver DesktopSidebar).
+    if (LocalWide.current) return
+
     val onSurface = MaterialTheme.colorScheme.onSurface
     Row(
         modifier = modifier

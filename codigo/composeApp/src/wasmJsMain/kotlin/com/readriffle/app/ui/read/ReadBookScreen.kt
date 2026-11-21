@@ -55,6 +55,7 @@ import coil.compose.AsyncImage
 import com.readriffle.app.R
 import com.readriffle.app.data.ratings.ReadEntry
 import com.readriffle.app.ui.common.BookRoomDialog
+import com.readriffle.app.ui.common.desktopCentered
 import com.readriffle.app.ui.common.BookRoomDialogText
 import com.readriffle.app.viewmodel.ReadBookViewModel
 import com.readriffle.app.platform.File
@@ -111,14 +112,18 @@ fun ReadBookScreen(viewModel: ReadBookViewModel, onBack: () -> Unit, onReread: (
                 Brush.verticalGradient(listOf(primary.copy(alpha = 0.26f), primary.copy(alpha = 0.05f), Color.Transparent))
             )
         )
+        val wide = com.readriffle.app.ui.common.LocalWide.current
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding().padding(bottom = 32.dp)
+                .then(Modifier.desktopCentered(1120.dp))
         ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 CircleIcon(R.drawable.ic_arrow_back, "Volver", onBack)
                 CircleIcon(R.drawable.ic_edit, "Editar opinión") { editing = true }
             }
 
+
+            if (!wide) {
             // La portada entra girando un poco y se asienta con un muelle.
             val pop = remember { androidx.compose.animation.core.Animatable(0f) }
             LaunchedEffect(Unit) {
@@ -126,7 +131,7 @@ fun ReadBookScreen(viewModel: ReadBookViewModel, onBack: () -> Unit, onReread: (
             }
             ReadCover(
                 entry.title, entry.coverPath,
-                Modifier.align(Alignment.CenterHorizontally).width(158.dp).aspectRatio(2f / 3f)
+                Modifier.align(Alignment.CenterHorizontally).width(if (wide) 260.dp else 158.dp).aspectRatio(2f / 3f)
                     .graphicsLayer {
                         val p = pop.value
                         alpha = p.coerceIn(0f, 1f)
@@ -152,6 +157,7 @@ fun ReadBookScreen(viewModel: ReadBookViewModel, onBack: () -> Unit, onReread: (
                 modifier = Modifier.align(Alignment.CenterHorizontally).appearIn(4).padding(top = 10.dp).clip(RoundedCornerShape(50))
                     .clickable { pickDate = true }.padding(horizontal = 12.dp, vertical = 6.dp)
             )
+
 
             Column(Modifier.padding(horizontal = 20.dp).padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 // Tu nota: se cambia tocando las estrellas.
@@ -216,6 +222,114 @@ fun ReadBookScreen(viewModel: ReadBookViewModel, onBack: () -> Unit, onReread: (
                         fontSize = 15.sp, color = MaterialTheme.colorScheme.error
                     )
                 }
+            }
+            } else {
+            // Ordenador: portada, datos y botones a la izquierda; tu nota y la de los lectores a la derecha.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp), horizontalArrangement = Arrangement.spacedBy(44.dp)) {
+                Column(Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // La portada entra girando un poco y se asienta con un muelle.
+            val pop = remember { androidx.compose.animation.core.Animatable(0f) }
+            LaunchedEffect(Unit) {
+                pop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 260f))
+            }
+            ReadCover(
+                entry.title, entry.coverPath,
+                Modifier.align(Alignment.CenterHorizontally).width(if (wide) 260.dp else 158.dp).aspectRatio(2f / 3f)
+                    .graphicsLayer {
+                        val p = pop.value
+                        alpha = p.coerceIn(0f, 1f)
+                        scaleX = 0.78f + 0.22f * p; scaleY = 0.78f + 0.22f * p
+                        rotationZ = (1f - p) * -7f
+                        translationY = (1f - p) * 60f
+                    }
+                    .shadow(18.dp, RoundedCornerShape(14.dp), ambientColor = primary, spotColor = primary)
+                    .clip(RoundedCornerShape(14.dp))
+            )
+            Spacer(Modifier.height(18.dp))
+            Text(
+                entry.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).appearIn(2)
+            )
+            Text(
+                entry.author, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(top = 4.dp).appearIn(3)
+            )
+            Text(
+                "Leído el ${readDateFormat.format(Date(record.finishedAtMillis))}",
+                style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, color = primary,
+                modifier = Modifier.align(Alignment.CenterHorizontally).appearIn(4).padding(top = 10.dp).clip(RoundedCornerShape(50))
+                    .clickable { pickDate = true }.padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+
+
+                    Spacer(Modifier.height(10.dp))
+                entry.libraryBook?.let { book ->
+                    Box(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(primary).clickable { onReread(book.id) }.padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) { Text("Volver a leerlo", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary) }
+                }
+                Box(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface)
+                        .clickable { confirmRemove = true }.padding(vertical = 15.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (entry.libraryBook != null) "Quitar de Leídos" else "Eliminar de Leídos",
+                        fontSize = 15.sp, color = MaterialTheme.colorScheme.error
+                    )
+                }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Tu nota: se cambia tocando las estrellas.
+                Column(
+                    Modifier.fillMaxWidth().appearIn(5).clip(RoundedCornerShape(24.dp))
+                        .background(Brush.verticalGradient(listOf(primary.copy(alpha = 0.14f), MaterialTheme.colorScheme.surface)))
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ReadLabel("Tu nota")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        StarRating(record.rating, size = 36.dp, spacing = 8.dp, appearDelayMs = 350, onChange = viewModel::setRating)
+                        if (record.rating > 0) Column {
+                            Text(formatHalfStars(record.rating), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = primary)
+                            Text(ratingWord(record.rating), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (record.review.isNotBlank()) {
+                        Text(record.review, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                    } else {
+                        Text(
+                            "Añade tu opinión", style = MaterialTheme.typography.bodyMedium, color = primary,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).clickable { editing = true }.padding(vertical = 4.dp)
+                        )
+                    }
+                }
+
+                if (record.favoriteQuote.isNotBlank()) {
+                    Column(
+                        Modifier.fillMaxWidth().appearIn(6).clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surface).padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ReadLabel("Frase favorita")
+                        Text(
+                            "“${record.favoriteQuote}”", style = MaterialTheme.typography.bodyLarge, fontStyle = FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                CommunityCard(
+                    modifier = Modifier.appearIn(7),
+                    record = record,
+                    loading = state.loadingRatings,
+                    onRefresh = viewModel::refreshRatings,
+                    onOpenUrl = { url -> com.readriffle.app.platform.openUrl(url) }
+                )
+
+
+                }
+            }
             }
         }
     }

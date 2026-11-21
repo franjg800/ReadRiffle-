@@ -163,3 +163,15 @@ internal external fun jsOnHidden(cb: () -> Unit)
 
 @JsFun("(u) => window.br.jsonp(u)")
 internal external fun jsJsonp(url: String): Promise<JsString>
+
+@JsFun("() => (window.BOOKROOM_CONFIG && window.BOOKROOM_CONFIG.contactEmail) || ''")
+internal external fun jsContactEmail(): String
+
+@JsFun("() => navigator.onLine !== false")
+internal external fun jsOnline(): Boolean
+
+@JsFun("() => window.bookroomInstalar && window.bookroomInstalar.primeraVez()")
+internal external fun jsInstallFirstTime()
+
+@JsFun("(cb) => window.br.onKey(cb)")
+internal external fun jsOnKey(cb: (String) -> Boolean)

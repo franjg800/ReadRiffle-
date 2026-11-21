@@ -154,6 +154,21 @@ fun NormalReaderContent(
         }
     }
 
+    // Ordenador: flechas, espacio y Re/Av Pág pasan de página.
+    val nextRef = androidx.compose.runtime.rememberUpdatedState({ goNext() })
+    val prevRef = androidx.compose.runtime.rememberUpdatedState({ goPrev() })
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val handler: (String) -> Boolean = { key ->
+            when (key) {
+                "ArrowRight", "PageDown", " " -> { nextRef.value(); true }
+                "ArrowLeft", "PageUp" -> { prevRef.value(); true }
+                else -> false
+            }
+        }
+        com.readriffle.app.platform.KeyShortcuts.add(handler)
+        onDispose { com.readriffle.app.platform.KeyShortcuts.remove(handler) }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
