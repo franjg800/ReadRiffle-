@@ -22,4 +22,6 @@ class AppContainer {
     val storeLinksRepository: StoreLinksRepository = StoreLinksRepository()
     val coverLock: CoverLockController = CoverLockController()
     val statsRepository: StatsRepository = StatsRepository()
+    /** Sección Leídos: fichas de libros terminados y nota de los lectores. */
+    val readingLog: com.readriffle.app.data.ratings.ReadingLog = com.readriffle.app.data.ratings.ReadingLog(libraryRepository)
 }

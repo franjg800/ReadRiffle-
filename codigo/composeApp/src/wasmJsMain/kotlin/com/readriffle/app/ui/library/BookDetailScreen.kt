@@ -1,5 +1,6 @@
 package com.readriffle.app.ui.library
 
+import com.readriffle.app.platform.System
 import com.readriffle.app.platform.shareText
 import com.readriffle.app.platform.formatInt
 import com.readriffle.app.platform.SimpleDateFormat
@@ -34,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,9 +77,11 @@ import kotlin.math.roundToInt
 fun BookDetailScreen(
     viewModel: BookDetailViewModel,
     onBack: () -> Unit,
-    onRead: (String) -> Unit
+    onRead: (String) -> Unit,
+    onOpenRead: (String) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
+    var markingRead by remember { mutableStateOf(false) }
     val picker by viewModel.picker.collectAsState()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
@@ -86,7 +90,20 @@ fun BookDetailScreen(
         when {
             state.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             book == null -> LaunchedEffect(Unit) { onBack() }
-            else -> BookDetailContent(book, state.wpm, onBack, onRead, viewModel::editBook, viewModel::openCoverPicker) { viewModel.deleteBook(onBack) }
+            else -> BookDetailContent(
+                book, state.wpm, onBack, onRead, viewModel::editBook, viewModel::openCoverPicker,
+                onMarkRead = { if (book.isFinished) onOpenRead("lib:${book.id}") else markingRead = true }
+            ) { viewModel.deleteBook(onBack) }
+        }
+        if (markingRead && book != null) {
+            com.readriffle.app.ui.read.FinishBookSheet(
+                heading = book.title,
+                celebrate = true,
+                initial = book.finished?.copy(finishedAtMillis = System.currentTimeMillis()),
+                quotes = book.highlights.sortedBy { it.createdAtMillis }.map { it.text.trim() }.filter { it.isNotEmpty() },
+                onSave = { record, _, _ -> viewModel.markRead(record); markingRead = false; onOpenRead("lib:${book.id}") },
+                onDismiss = { markingRead = false }
+            )
         }
         val p = picker
         if (p != null && book != null) {
@@ -109,6 +126,7 @@ private fun BookDetailContent(
     onRead: (String) -> Unit,
     onEdit: (String, String) -> Unit,
     onChangeCover: () -> Unit,
+    onMarkRead: () -> Unit = {},
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
@@ -261,6 +279,26 @@ private fun BookDetailContent(
                     stringResource(if (started && !finished) R.string.book_detail_continue else if (finished) R.string.book_detail_continue else R.string.book_detail_start),
                     fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary
                 )
+            }
+            // Leídos: marcar como leído o, si ya lo está, ver su ficha (tu nota frente a la de los lectores).
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                    .background(if (book.isFinished) primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface)
+                    .clickable(onClick = onMarkRead).padding(horizontal = 18.dp, vertical = 15.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (book.isFinished) {
+                    Text("Leído", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = primary)
+                    val stars = book.finished?.rating ?: 0
+                    if (stars > 0) {
+                        androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
+                        com.readriffle.app.ui.read.StarRating(stars, size = 16.dp, spacing = 2.dp)
+                    }
+                    Text("  ·  Ver ficha", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Text("Marcar como leído", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(

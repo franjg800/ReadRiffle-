@@ -23,6 +23,12 @@ sealed class Screen(val route: String) {
 
     data object Settings : Screen("settings")
 
+    /** Ficha de un libro de Leídos. [key] = "lib:<id>" (de la biblioteca) o "ext:<id>" (apuntado a mano). */
+    data object ReadBook : Screen("read/{key}") {
+        const val ARG_KEY = "key"
+        fun createRoute(key: String) = "read/$key"
+    }
+
     data object Notes : Screen("notes")
 
     data object Stats : Screen("stats")

@@ -19,11 +19,14 @@ class JSONObject(private val obj: JsonObject) {
     fun optString(key: String): String = (obj[key] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content ?: ""
     fun getLong(key: String): Long = (obj[key] as? JsonPrimitive)?.longOrNull ?: (obj[key] as? JsonPrimitive)?.content?.toDoubleOrNull()?.toLong() ?: 0L
     fun keys(): Iterator<String> = obj.keys.iterator()
+    fun optInt(key: String, def: Int = 0): Int = (obj[key] as? JsonPrimitive)?.content?.toDoubleOrNull()?.toInt() ?: def
+    fun optDouble(key: String, def: Double = 0.0): Double = (obj[key] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: def
 }
 
 class JSONArray(private val arr: JsonArray) {
     fun length() = arr.size
     fun getJSONObject(i: Int): JSONObject = JSONObject(arr[i] as? JsonObject ?: JsonObject(emptyMap()))
     fun optLong(i: Int): Long = (arr.getOrNull(i) as? JsonPrimitive)?.longOrNull ?: 0L
+    fun optString(i: Int): String = (arr.getOrNull(i) as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content ?: ""
     @Suppress("unused") fun get(i: Int): JsonElement = arr[i]
 }

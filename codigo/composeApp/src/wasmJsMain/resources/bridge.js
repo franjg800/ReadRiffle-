@@ -109,6 +109,19 @@
         return { status: 0, body: '', error: String(e && e.message || e) };
       }
     },
+    // JSONP: para APIs que no permiten peticiones desde otras webs (CORS) pero sí ?callback= (Apple).
+    jsonp(url) {
+      return new Promise(res => {
+        const cb = 'brjp' + Date.now() + Math.floor(Math.random() * 1e6);
+        const s = document.createElement('script');
+        const cleanup = () => { clearTimeout(t); try { delete window[cb]; } catch (e) {} s.remove(); };
+        const t = setTimeout(() => { cleanup(); res(''); }, 12000);
+        window[cb] = d => { cleanup(); res(JSON.stringify(d)); };
+        s.onerror = () => { cleanup(); res(''); };
+        s.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cb;
+        document.head.appendChild(s);
+      });
+    },
     utf8ToLatin1(s) { return bytesToLatin1(new TextEncoder().encode(s)); },
     latin1ToUtf8(s) { return new TextDecoder('utf-8').decode(latin1ToBytes(s)); },
 

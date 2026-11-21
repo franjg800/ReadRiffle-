@@ -193,7 +193,62 @@ data class BookMeta(
      * sincronización con Drive (que une las listas de los dos dispositivos) los volvía a traer
      * desde la copia remota y el subrayado "resucitaba" justo después de borrarlo.
      */
-    val deletedItemIds: List<String> = emptyList()
+    val deletedItemIds: List<String> = emptyList(),
+    /** ISBN del EPUB (dc:identifier), si lo trae: sirve para encontrar la nota de los lectores. */
+    val isbn: String? = null,
+    /** Ficha de "leído" (nota, opinión, notas de lectores). null = nunca se ha marcado como leído. */
+    val finished: ReadingRecord? = null
+) {
+    /** Marcado como leído (y no desmarcado después). */
+    val isFinished: Boolean get() = finished?.active == true
+}
+
+/**
+ * Nota media de los lectores en una web de referencia (Apple Books, Open Library, Google Books).
+ * [average] siempre en escala 0-5; [count] = número de valoraciones en esa web.
+ */
+@Serializable
+data class CommunityRating(
+    val source: String,
+    val average: Float,
+    val count: Int,
+    val url: String? = null,
+    /** Título y autor de la ficha que se encontró, para comprobar que es el libro correcto. */
+    val matchedTitle: String = ""
+)
+
+/**
+ * Lo que guarda la sección Leídos de un libro terminado. [rating] va en medias estrellas:
+ * 0 = sin nota, 1 = media estrella ... 10 = cinco estrellas. [active] = false cuando se desmarca
+ * (se conserva la ficha con la fecha de cambio para que la sincronización no la "resucite").
+ */
+@Serializable
+data class ReadingRecord(
+    val finishedAtMillis: Long = System.currentTimeMillis(),
+    val rating: Int = 0,
+    val review: String = "",
+    val favoriteQuote: String = "",
+    val communityRatings: List<CommunityRating> = emptyList(),
+    val ratingsFetchedAtMillis: Long = 0L,
+    val active: Boolean = true,
+    val updatedAtMillis: Long = System.currentTimeMillis()
+)
+
+/**
+ * Un libro leído FUERA de la app (en papel, en otro lector...) apuntado a mano en Leídos. También
+ * acaban aquí los libros de la biblioteca que se borran después de marcarlos como leídos: el EPUB
+ * se va, pero la ficha de leído se queda.
+ */
+@Serializable
+data class ExternalReadBook(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val author: String,
+    val coverPath: String? = null,
+    val isbn: String? = null,
+    val totalWordCount: Int = 0,
+    val record: ReadingRecord = ReadingRecord(),
+    val lastModifiedMillis: Long = System.currentTimeMillis()
 )
 
 /**
@@ -216,5 +271,9 @@ data class LibraryIndex(
     val books: List<BookMeta> = emptyList(),
     val deletedBooks: List<DeletedBookMeta> = emptyList(),
     /** Secciones creadas por el usuario (pueden estar vacías); el orden es el de creación. */
-    val shelfNames: List<String> = emptyList()
+    val shelfNames: List<String> = emptyList(),
+    /** Libros leídos fuera de la app (o borrados de la biblioteca tras leerlos). */
+    val externalReads: List<ExternalReadBook> = emptyList(),
+    /** Ids de libros leídos externos que el usuario quitó (lápidas para la sincronización). */
+    val deletedReadIds: List<String> = emptyList()
 )

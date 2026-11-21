@@ -187,6 +187,26 @@ class EpubParser {
         }
     }
 
+    /** ISBN del libro según los metadatos (dc:identifier), o null si no trae ninguno válido. */
+    fun readIsbn(epubFile: File): String? = runCatching {
+        ZipFile(epubFile).use { zip ->
+            val pkg = readPackage(zip, epubFile)
+            val ids = pkg.opfDoc.getElementsByTagNameNS("*", "identifier")
+            val candidates = mutableListOf<String>()
+            for (i in 0 until ids.length) {
+                val el = ids.item(i) as? Element ?: continue
+                val text = el.textContent?.trim().orEmpty()
+                val scheme = (el.attr("opf:scheme") + " " + el.attrNS("http://www.idpf.org/2007/opf", "scheme")).lowercase()
+                val digits = text.replace(Regex("[^0-9Xx]"), "").uppercase()
+                val looksIsbn = scheme.contains("isbn") || text.lowercase().contains("isbn")
+                if ((digits.length == 13 && (digits.startsWith("978") || digits.startsWith("979"))) || (looksIsbn && digits.length == 10)) {
+                    candidates += digits
+                }
+            }
+            candidates.firstOrNull { it.length == 13 } ?: candidates.firstOrNull()
+        }
+    }.getOrNull()
+
     private fun wordCountApprox(text: String): Int {
         var n = 0
         var inWord = false

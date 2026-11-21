@@ -7,6 +7,8 @@ import com.readriffle.app.data.model.BookmarkMeta
 import com.readriffle.app.data.model.PinnedPageMeta
 import com.readriffle.app.data.model.BookMeta
 import com.readriffle.app.data.model.DeletedBookMeta
+import com.readriffle.app.data.model.ExternalReadBook
+import com.readriffle.app.data.model.ReadingRecord
 import com.readriffle.app.data.model.GeneratedImageMeta
 import com.readriffle.app.data.model.HighlightMeta
 import com.readriffle.app.data.model.LibraryIndex
@@ -134,7 +136,8 @@ class LibraryRepository {
             totalWordCount = totalWordCount,
             chapterScheme = CURRENT_CHAPTER_SCHEME,
             series = parsed.series,
-            sourceKey = sourceKey
+            sourceKey = sourceKey,
+            isbn = runCatching { parser.readIsbn(destFile) }.getOrNull()
         )
 
         mutateLibrary { it + meta }
@@ -524,8 +527,18 @@ class LibraryRepository {
      * seguir arrastrándolo para siempre, pero por simplicidad aquí simplemente se guarda la
      * fusión completa que ya calculó el propio sincronizador.
      */
-    suspend fun applyMergedLibrary(books: List<BookMeta>, deletedBooks: List<DeletedBookMeta>) =
-        mutateIndex { current ->
+    suspend fun applyMergedLibrary(
+        books: List<BookMeta>,
+        deletedBooks: List<DeletedBookMeta>,
+        externalReads: List<ExternalReadBook>? = null,
+        deletedReadIds: List<String>? = null
+    ) =
+        mutateIndex { current0 ->
+            val readTombstones = ((deletedReadIds ?: emptyList()) + current0.deletedReadIds).distinct()
+            val current = if (externalReads == null) current0 else current0.copy(
+                externalReads = mergeExternalReads(current0.externalReads, externalReads).filter { it.id !in readTombstones },
+                deletedReadIds = readTombstones
+            )
             // Si mientras sincronizaba el usuario borró un subrayado/nota, esa lápida ya está en el
             // índice actual pero no en `books` (calculado antes): se vuelve a aplicar aquí.
             val reconciled = books.map { b ->
@@ -545,6 +558,74 @@ class LibraryRepository {
             current.copy(books = reconciled, deletedBooks = deletedBooks)
         }
 
+    // --- Leídos ----------------------------------------------------------------------------------
+
+    suspend fun loadExternalReads(): List<ExternalReadBook> = loadIndex().externalReads
+
+    suspend fun loadDeletedReadIds(): List<String> = loadIndex().deletedReadIds
+
+    /** Marca un libro de la biblioteca como leído (o actualiza su ficha). */
+    suspend fun saveReadRecord(bookId: String, record: ReadingRecord) = mutateLibrary { books ->
+        books.map {
+            if (it.id == bookId) it.copy(
+                finished = record.copy(updatedAtMillis = System.currentTimeMillis()),
+                lastModifiedMillis = System.currentTimeMillis()
+            ) else it
+        }
+    }
+
+    /** Cambia la ficha de leído de un libro de la biblioteca (nota, opinión, notas de lectores...). */
+    suspend fun updateReadRecord(bookId: String, transform: (ReadingRecord) -> ReadingRecord) = mutateLibrary { books ->
+        books.map {
+            val f = it.finished
+            if (it.id == bookId && f != null) it.copy(
+                finished = transform(f).copy(updatedAtMillis = System.currentTimeMillis()),
+                lastModifiedMillis = System.currentTimeMillis()
+            ) else it
+        }
+    }
+
+    /** Quita la marca de leído (la ficha se conserva inactiva para que la sincronización no la reviva). */
+    suspend fun unmarkFinished(bookId: String) = updateReadRecord(bookId) { it.copy(active = false) }
+
+    suspend fun addExternalRead(book: ExternalReadBook) = mutateIndex { idx ->
+        idx.copy(externalReads = idx.externalReads.filterNot { it.id == book.id } + book)
+    }
+
+    suspend fun updateExternalRead(id: String, transform: (ExternalReadBook) -> ExternalReadBook) = mutateIndex { idx ->
+        idx.copy(externalReads = idx.externalReads.map {
+            if (it.id == id) transform(it).copy(lastModifiedMillis = System.currentTimeMillis()) else it
+        })
+    }
+
+    suspend fun removeExternalRead(id: String) = mutateIndex { idx ->
+        idx.externalReads.find { it.id == id }?.coverPath?.let { runCatching { File(it).delete() } }
+        idx.copy(
+            externalReads = idx.externalReads.filterNot { it.id == id },
+            deletedReadIds = (idx.deletedReadIds + id).distinct()
+        )
+    }
+
+    /** Guarda la portada de un libro leído fuera de la app y devuelve su ruta. */
+    suspend fun saveExternalCover(id: String, imageBytes: ByteArray): String? = withContext(Dispatchers.Default) {
+        runCatching {
+            val jpeg = ImageTools.reencode(imageBytes, 900, byHeight = true) ?: return@runCatching null
+            val file = File(coversDir, "read_${id}_${System.currentTimeMillis()}.jpg")
+            file.writeBytes(jpeg)
+            file.absolutePath
+        }.getOrNull()
+    }
+
+    /** ISBN del libro (lo lee del EPUB la primera vez y lo guarda). */
+    suspend fun isbnFor(meta: BookMeta): String? {
+        meta.isbn?.let { return it }
+        val epub = File(booksDir, meta.epubFileName)
+        Vfs.ensureLoaded(epub.path)
+        val isbn = parser.readIsbn(epub).also { Vfs.evict(epub.path) } ?: return null
+        mutateLibrary { books -> books.map { if (it.id == meta.id) it.copy(isbn = isbn) else it } }
+        return isbn
+    }
+
     /**
      * Borra un libro EN ESTE DISPOSITIVO y dejar una "lápida" (ver [DeletedBookMeta]) -- bug
      * corregido: antes solo se quitaba de la lista local, así que en la siguiente sincronización
@@ -557,6 +638,21 @@ class LibraryRepository {
         writeMutex.withLock {
             val current = loadIndex()
             val meta = current.books.find { it.id == bookId } ?: return@withLock
+            // Si ya estaba marcado como leído, la ficha de "Leídos" se queda (con su portada).
+            val keptRead = if (meta.isFinished) {
+                val keptCover = (meta.coverPath ?: originalCoverPath(meta.id))?.let { path ->
+                    runCatching {
+                        val dest = File(coversDir, "read_${meta.id}.jpg")
+                        dest.writeBytes(File(path).readBytes())
+                        dest.absolutePath
+                    }.getOrNull()
+                }
+                ExternalReadBook(
+                    id = meta.id, title = meta.title, author = meta.author, coverPath = keptCover,
+                    isbn = meta.isbn, totalWordCount = meta.totalWordCount,
+                    record = meta.finished!!, lastModifiedMillis = System.currentTimeMillis()
+                )
+            } else null
             File(booksDir, meta.epubFileName).delete()
             meta.coverPath?.let { File(it).delete() }
             File(coversDir, "${meta.id}.jpg").delete()
@@ -566,12 +662,18 @@ class LibraryRepository {
             saveIndex(
                 current.copy(
                     books = current.books.filterNot { it.id == bookId },
-                    deletedBooks = current.deletedBooks.filterNot { it.id == bookId } + DeletedBookMeta(bookId)
+                    deletedBooks = current.deletedBooks.filterNot { it.id == bookId } + DeletedBookMeta(bookId),
+                    externalReads = if (keptRead == null) current.externalReads
+                    else current.externalReads.filterNot { it.id == bookId } + keptRead
                 )
             )
         }
     }
 }
+
+/** Une dos listas de libros leídos externos: por id, se queda la copia modificada más tarde. */
+internal fun mergeExternalReads(a: List<ExternalReadBook>, b: List<ExternalReadBook>): List<ExternalReadBook> =
+    (a + b).groupBy { it.id }.map { (_, v) -> v.maxBy { it.lastModifiedMillis } }
 
 /** Versión actual del reparto en capítulos (ver BookMeta.chapterScheme). */
 internal const val CURRENT_CHAPTER_SCHEME = 2

@@ -154,6 +154,23 @@ fun ReadingScreen(viewModel: ReadingViewModel, onExit: () -> Unit, onOpenPlayer:
         }
     }
 
+    // Leídos: al llegar al final del libro (última palabra en RSVP o última página en modo libro)
+    // se pregunta qué te ha parecido.
+    LaunchedEffect(uiState.isLoading, uiState.chapterIndex, uiState.isChapterFinished, uiState.overallProgressFraction) {
+        if (!uiState.isLoading && uiState.chapters.isNotEmpty() && uiState.chapterIndex == uiState.chapters.lastIndex &&
+            (uiState.isChapterFinished || uiState.overallProgressFraction >= 0.995f)
+        ) viewModel.onReachedBookEnd()
+    }
+    if (uiState.showFinishPrompt) {
+        com.readriffle.app.ui.read.FinishBookSheet(
+            heading = "¡Has terminado «${uiState.bookTitle}»!",
+            celebrate = true,
+            quotes = uiState.highlights.sortedBy { it.createdAtMillis }.map { it.text.trim() }.filter { it.isNotEmpty() },
+            onSave = { record, _, _ -> viewModel.markFinished(record) },
+            onDismiss = viewModel::dismissFinishPrompt
+        )
+    }
+
     if (uiState.showChapterIndex) {
         ChapterIndexSheet(
             chapters = uiState.chapters,

@@ -160,3 +160,6 @@ internal external fun jsOpenInstallGuide()
 
 @JsFun("(cb) => window.br.onHidden(cb)")
 internal external fun jsOnHidden(cb: () -> Unit)
+
+@JsFun("(u) => window.br.jsonp(u)")
+internal external fun jsJsonp(url: String): Promise<JsString>

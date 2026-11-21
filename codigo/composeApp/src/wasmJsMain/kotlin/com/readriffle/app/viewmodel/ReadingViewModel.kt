@@ -78,7 +78,11 @@ data class ReadingUiState(
     val geminiApiKey: String = "",
     val isGeneratingImage: Boolean = false,
     val generatedImagePreview: GeneratedImagePreview? = null,
-    val imageGenerationError: String? = null
+    val imageGenerationError: String? = null,
+    /** Ya está en Leídos (no se vuelve a preguntar al llegar al final). */
+    val alreadyFinished: Boolean = false,
+    /** Mostrar la hoja "¿Lo has terminado?" (se llegó al final del libro). */
+    val showFinishPrompt: Boolean = false
 ) {
     val chapterProgressFraction: Float
         get() = if (tokens.isEmpty()) 0f else (wordIndex.coerceAtMost(tokens.size)).toFloat() / tokens.size.toFloat()
@@ -157,8 +161,29 @@ class ReadingViewModel(
     // pantalla de Notas para saltar a un subrayado/nota concreto en vez de retomar por donde se
     // quedó la lectura la última vez. -1 = no hay salto pendiente, usar la última posición.
     private val initialChapterIndex: Int = -1,
-    private val initialWordIndex: Int = -1
+    private val initialWordIndex: Int = -1,
+    private val readingLog: com.readriffle.app.data.ratings.ReadingLog? = null
 ) : ViewModel() {
+
+    /** Solo se pregunta una vez por sesión de lectura (si se dice "Ahora no", no insiste). */
+    private var finishPromptShown = false
+
+    /** Se ha llegado a la última página / última palabra del libro. */
+    fun onReachedBookEnd() {
+        val st = _uiState.value
+        if (st.isLoading || st.alreadyFinished || finishPromptShown || readingLog == null) return
+        finishPromptShown = true
+        _uiState.update { it.copy(showFinishPrompt = true) }
+    }
+
+    fun dismissFinishPrompt() = _uiState.update { it.copy(showFinishPrompt = false) }
+
+    /** Guarda el libro en Leídos con su nota y opinión. */
+    fun markFinished(record: com.readriffle.app.data.model.ReadingRecord) {
+        _uiState.update { it.copy(showFinishPrompt = false, alreadyFinished = true) }
+        saveProgress()
+        viewModelScope.launch { readingLog?.save("lib:$bookId", record) }
+    }
 
     private val _uiState = MutableStateFlow(ReadingUiState())
     val uiState: StateFlow<ReadingUiState> = _uiState.asStateFlow()
@@ -288,7 +313,8 @@ class ReadingViewModel(
                     highlights = meta.highlights,
                     notes = meta.notes,
                     bookmarks = meta.bookmarks,
-                    pinnedPages = meta.pinnedPages
+                    pinnedPages = meta.pinnedPages,
+                    alreadyFinished = meta.isFinished
                 )
             }
             // Al saltar aquí desde una nota/subrayado concreto de la pantalla de Notas, esa
@@ -888,6 +914,7 @@ class ReadingViewModel(
                     preferencesRepository = container.userPreferencesRepository,
                     geminiImageClient = container.geminiImageClient,
                     statsRepository = container.statsRepository,
+                    readingLog = container.readingLog,
                     coverLock = container.coverLock,
                     initialChapterIndex = initialChapterIndex,
                     initialWordIndex = initialWordIndex

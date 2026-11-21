@@ -1,5 +1,6 @@
 package com.readriffle.app.platform
 
+import com.readriffle.app.platform.System
 import kotlinx.coroutines.await
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -225,3 +226,6 @@ object AppVisibility {
     }
     fun remove(l: () -> Unit) { listeners -= l }
 }
+
+/** Petición JSONP (para Apple Books, que no admite CORS). Texto JSON o vacío si falla. */
+suspend fun jsonpRequest(url: String): String = jsJsonp(url).await<JsString>().toString()

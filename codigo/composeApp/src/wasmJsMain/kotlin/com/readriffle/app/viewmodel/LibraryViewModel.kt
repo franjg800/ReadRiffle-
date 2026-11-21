@@ -31,8 +31,15 @@ data class LibraryUiState(
     val folderImportMessage: String? = null,
     val importFolderUri: String = "",
     val isScanning: Boolean = false,
-    val shelfNames: List<String> = emptyList()
+    val shelfNames: List<String> = emptyList(),
+    /** Pestaña de la Biblioteca: libros que se están leyendo o sección Leídos. */
+    val tab: LibraryTab = LibraryTab.READING,
+    /** Libros terminados (de la biblioteca y apuntados a mano), del más reciente al más antiguo. */
+    val readEntries: List<com.readriffle.app.data.ratings.ReadEntry> = emptyList()
 ) {
+    /** Libros de la pestaña "Leyendo": los que no están marcados como leídos. */
+    val readingBooks: List<BookMeta> get() = books.filterNot { it.isFinished }
+
     /**
      * Secciones de la biblioteca: primero las que crea el usuario (aunque estén vacías) y después
      * las sagas detectadas solas en los EPUB (una por cada saga).
@@ -65,8 +72,10 @@ data class LibraryUiState(
      * reciente. Se destaca arriba de todo en la Biblioteca; null si aún no se ha abierto ninguno.
      */
     val currentBook: BookMeta?
-        get() = books.filter { it.lastOpenedAtMillis > 0L }.maxByOrNull { it.lastOpenedAtMillis }
+        get() = books.filter { it.lastOpenedAtMillis > 0L && !it.isFinished }.maxByOrNull { it.lastOpenedAtMillis }
 }
+
+enum class LibraryTab { READING, READ }
 
 /** Una sección de la biblioteca: nombre + libros. [isCustom] = creada por el usuario (editable); si no, es una saga automática. */
 data class LibrarySection(val name: String, val books: List<BookMeta>, val isCustom: Boolean)
@@ -74,7 +83,8 @@ data class LibrarySection(val name: String, val books: List<BookMeta>, val isCus
 class LibraryViewModel(
     private val repository: LibraryRepository,
     private val preferencesRepository: UserPreferencesRepository,
-    private val statsRepository: com.readriffle.app.data.stats.StatsRepository? = null
+    private val statsRepository: com.readriffle.app.data.stats.StatsRepository? = null,
+    private val readingLog: com.readriffle.app.data.ratings.ReadingLog? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
@@ -95,7 +105,8 @@ class LibraryViewModel(
             val books = repository.loadLibrary().sortedByDescending { it.addedAtMillis }
             val stats = statsRepository?.summary() ?: com.readriffle.app.data.stats.StatsSummary()
             val shelfNames = repository.loadShelfNames()
-            _uiState.update { it.copy(isLoading = false, books = books, stats = stats, shelfNames = shelfNames) }
+            val reads = readingLog?.entries().orEmpty()
+            _uiState.update { it.copy(isLoading = false, books = books, stats = stats, shelfNames = shelfNames, readEntries = reads) }
         }
     }
 
@@ -161,9 +172,23 @@ class LibraryViewModel(
 
     fun dismissError() = _uiState.update { it.copy(importError = null) }
 
+    fun selectTab(tab: LibraryTab) = _uiState.update { it.copy(tab = tab) }
+
+    /** Apunta en Leídos un libro leído fuera de la app (portada y nota de lectores se buscan solas). */
+    fun addExternalRead(title: String, author: String, record: com.readriffle.app.data.model.ReadingRecord) {
+        val log = readingLog ?: return
+        viewModelScope.launch {
+            log.addExternal(title, author, record)
+            refresh()
+            // La portada y la nota llegan unos segundos después: se refresca otra vez.
+            kotlinx.coroutines.delay(6_000)
+            refresh()
+        }
+    }
+
     companion object {
         fun factory(container: AppContainer) = viewModelFactory {
-            initializer { LibraryViewModel(container.libraryRepository, container.userPreferencesRepository, container.statsRepository) }
+            initializer { LibraryViewModel(container.libraryRepository, container.userPreferencesRepository, container.statsRepository, container.readingLog) }
         }
     }
 }

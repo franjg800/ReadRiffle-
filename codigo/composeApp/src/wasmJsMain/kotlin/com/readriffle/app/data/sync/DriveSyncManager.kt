@@ -25,7 +25,10 @@ sealed class SyncResult {
 @Serializable
 private data class SyncManifest(
     val books: List<BookMeta> = emptyList(),
-    val deletedBooks: List<DeletedBookMeta> = emptyList()
+    val deletedBooks: List<DeletedBookMeta> = emptyList(),
+    /** Libros leídos fuera de la app (sección Leídos) y sus lápidas. */
+    val externalReads: List<com.readriffle.app.data.model.ExternalReadBook> = emptyList(),
+    val deletedReadIds: List<String> = emptyList()
 )
 
 /**
@@ -132,7 +135,9 @@ class DriveSyncManager(
                     highlights = group.flatMap { it.highlights }.distinctBy { it.id }.filter { h -> group.none { g -> h.id in g.deletedItemIds } },
                     notes = group.flatMap { it.notes }.distinctBy { it.id }.filter { h -> group.none { g -> h.id in g.deletedItemIds } },
                     bookmarks = group.flatMap { it.bookmarks }.distinctBy { it.id }.filter { h -> group.none { g -> h.id in g.deletedItemIds } },
-                    pinnedPages = group.flatMap { it.pinnedPages }.distinctBy { it.id }.filter { h -> group.none { g -> h.id in g.deletedItemIds } }
+                    pinnedPages = group.flatMap { it.pinnedPages }.distinctBy { it.id }.filter { h -> group.none { g -> h.id in g.deletedItemIds } },
+                    finished = group.mapNotNull { it.finished }.maxByOrNull { it.updatedAtMillis },
+                    isbn = group.firstNotNullOfOrNull { it.isbn }
                 )
                 group.filterNot { it.id == primary.id }.forEach { duplicate ->
                     mergedDeleted.removeAll { it.id == duplicate.id }
@@ -162,9 +167,22 @@ class DriveSyncManager(
                 }
             }
 
-            libraryRepository.applyMergedLibrary(withUploads, mergedDeleted)
+            // Leídos fuera de la app: se unen por id (gana la copia más reciente) y se respetan las lápidas.
+            val mergedReadIds = (libraryRepository.loadDeletedReadIds() + remoteManifest.deletedReadIds).distinct()
+            val mergedReads = com.readriffle.app.data.repository.mergeExternalReads(
+                libraryRepository.loadExternalReads(), remoteManifest.externalReads
+            ).filter { it.id !in mergedReadIds }
+            // La portada de un leído externo es un archivo de ESTE dispositivo: la de otro no sirve aquí.
+            val localReads = libraryRepository.loadExternalReads().associateBy { it.id }
+            val readsForHere = mergedReads.map { r ->
+                val localCover = localReads[r.id]?.coverPath
+                val cover = r.coverPath?.takeIf { com.readriffle.app.platform.File(it).exists() } ?: localCover
+                if (cover == r.coverPath) r else r.copy(coverPath = cover)
+            }
 
-            val manifestBytes = json.encodeToString(SyncManifest.serializer(), SyncManifest(withUploads, mergedDeleted))
+            libraryRepository.applyMergedLibrary(withUploads, mergedDeleted, readsForHere, mergedReadIds)
+
+            val manifestBytes = json.encodeToString(SyncManifest.serializer(), SyncManifest(withUploads, mergedDeleted, readsForHere, mergedReadIds))
                 .encodeToByteArray()
             uploadFile(token, manifestFileId, manifestName, "application/json", manifestBytes, folderId)
 
@@ -198,7 +216,9 @@ class DriveSyncManager(
                 bookmarks = local.bookmarks.filter { it.id !in deletedSet },
                 pinnedPages = local.pinnedPages.filter { it.id !in deletedSet },
                 lastModifiedMillis = maxOf(local.lastModifiedMillis, remote.lastModifiedMillis),
-                driveFileId = local.driveFileId ?: remote.driveFileId
+                driveFileId = local.driveFileId ?: remote.driveFileId,
+                finished = listOfNotNull(local.finished, remote.finished).maxByOrNull { it.updatedAtMillis },
+                isbn = local.isbn ?: remote.isbn
             )
         }
         val remoteWins = remote.lastModifiedMillis > local.lastModifiedMillis
@@ -216,7 +236,9 @@ class DriveSyncManager(
             notes = mergeById(local.notes, remote.notes) { it.id }.filter { it.id !in deletedSet },
             bookmarks = mergeById(local.bookmarks, remote.bookmarks) { it.id }.filter { it.id !in deletedSet },
             pinnedPages = mergeById(local.pinnedPages, remote.pinnedPages) { it.id }.filter { it.id !in deletedSet },
-            driveFileId = local.driveFileId ?: remote.driveFileId
+            driveFileId = local.driveFileId ?: remote.driveFileId,
+                finished = listOfNotNull(local.finished, remote.finished).maxByOrNull { it.updatedAtMillis },
+                isbn = local.isbn ?: remote.isbn
             // coverPath, epubFileName y generatedImages se quedan los de `local` (ya vienen de
             // `local.copy(...)`): son específicos de este dispositivo y nunca se toman del otro.
         )

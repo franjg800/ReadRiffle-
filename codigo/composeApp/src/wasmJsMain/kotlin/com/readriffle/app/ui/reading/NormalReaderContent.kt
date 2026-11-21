@@ -109,6 +109,13 @@ fun NormalReaderContent(
     val pageIndex = pagination.pageIndex
     val pageStartWord = pagination.pageWordOffsets[pageIndex]
     val pageEndWord = pagination.pageWordOffsets.getOrElse(pageIndex + 1) { Int.MAX_VALUE }
+
+    // Leídos: la última página del último capítulo cuenta como "libro terminado".
+    LaunchedEffect(pageIndex, safePages.size, uiState.chapterIndex, uiState.chapters.size) {
+        if (safePages.isNotEmpty() && pageIndex == safePages.lastIndex && uiState.chapterIndex == uiState.chapters.lastIndex) {
+            viewModel.onReachedBookEnd()
+        }
+    }
     val isBookmarked = uiState.bookmarks.any { it.chapterIndex == uiState.chapterIndex && it.wordIndex in pageStartWord until pageEndWord }
 
     // Si veníamos de retroceder desde el capítulo siguiente, en cuanto este capítulo tenga

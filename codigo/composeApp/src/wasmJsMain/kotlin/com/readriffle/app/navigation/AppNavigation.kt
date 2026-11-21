@@ -130,6 +130,7 @@ fun AppNavigation(container: AppContainer) {
                 onContinue = { bookId -> navController.navigate(Screen.Reading.createRoute(bookId)) },
                 onOpenStats = { navController.navigate(Screen.Stats.route) },
                 onLockCover = { book -> container.coverLock.lock(book) },
+                onOpenRead = { key -> navController.navigate(Screen.ReadBook.createRoute(key)) },
                 onOpenNotes = { navigateTopLevel(navController, Screen.Notes.route) },
                 onOpenStore = { navigateTopLevel(navController, Screen.Store.route) },
                 onOpenSettings = { navigateTopLevel(navController, Screen.Settings.route) }
@@ -170,7 +171,8 @@ fun AppNavigation(container: AppContainer) {
                 BookDetailScreen(
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() },
-                    onRead = { id -> navController.navigate(Screen.Reading.createRoute(id)) }
+                    onRead = { id -> navController.navigate(Screen.Reading.createRoute(id)) },
+                    onOpenRead = { key -> navController.navigate(Screen.ReadBook.createRoute(key)) }
                 )
             }
         }
@@ -193,6 +195,22 @@ fun AppNavigation(container: AppContainer) {
                 ReadingScreen(
                     viewModel = viewModel,
                     onExit = { navController.popBackStack() }
+                )
+            }
+        }
+
+        composable(
+            route = Screen.ReadBook.route,
+            arguments = listOf(navArgument(Screen.ReadBook.ARG_KEY) { type = NavType.StringType })
+        ) { backStackEntry ->
+            val key = backStackEntry.argString(Screen.ReadBook.ARG_KEY)
+            if (key != null) {
+                val viewModel: com.readriffle.app.viewmodel.ReadBookViewModel =
+                    viewModel(factory = com.readriffle.app.viewmodel.ReadBookViewModel.factory(key, container))
+                com.readriffle.app.ui.read.ReadBookScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onReread = { id -> navController.navigate(Screen.Reading.createRoute(id)) }
                 )
             }
         }

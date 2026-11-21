@@ -36,7 +36,8 @@ data class CoverPickerState(
 class BookDetailViewModel(
     private val bookId: String,
     private val repository: LibraryRepository,
-    private val preferencesRepository: UserPreferencesRepository
+    private val preferencesRepository: UserPreferencesRepository,
+    private val readingLog: com.readriffle.app.data.ratings.ReadingLog? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BookDetailUiState())
@@ -58,6 +59,14 @@ class BookDetailViewModel(
     }
 
     /** Vuelve a leer de disco: se llama al volver desde la lectura para ver el progreso nuevo. */
+    /** Marca el libro como leído con su nota y opinión (y busca la nota de los lectores). */
+    fun markRead(record: com.readriffle.app.data.model.ReadingRecord) {
+        viewModelScope.launch {
+            readingLog?.save("lib:$bookId", record)
+            refresh()
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             val book = repository.loadLibrary().find { it.id == bookId }
@@ -127,7 +136,7 @@ class BookDetailViewModel(
 
     companion object {
         fun factory(bookId: String, container: AppContainer) = viewModelFactory {
-            initializer { BookDetailViewModel(bookId, container.libraryRepository, container.userPreferencesRepository) }
+            initializer { BookDetailViewModel(bookId, container.libraryRepository, container.userPreferencesRepository, container.readingLog) }
         }
     }
 }
